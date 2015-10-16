@@ -161,17 +161,26 @@ As can be seen from the example above each **AdEvent** contributes to 2 x 4 = 8 
 
 In addition to computing multiple aggregations for each dimension combination, aggregations can also be performed over time buckets. Time buckets are a window of time (e.g 1:00 pm - 1:01 pm or 1:00 pm - 2:00 pm) and they are specified by a simple notation: 1m is one minute, 1h is one hour, 1d is one day. When aggregations are performed over time buckets, separate aggregations are maintained for each time bucket, and the aggregations for a time bucket are only comprised of events with a time stamp that falls into that time bucket.
 
-Like with aggregators, aggregations can be performed for multiple time buckets simultaneously. As a result the number of aggregations that are maintained can be described by the following equation:
-
-NUM_AGGS = (2 x *(number of unique advertisers)* + 2 * *(number of unique locations)* + 2 * *(number of unique advertiser and location combinations)* + 2) x *(number of time buckets)*
-
 ##### An example of how these time bucketed aggregations are computed is as follows:
 
-* Let's say our advertisement publisher is interested in computing the Sum and Max of **AdEvents**
+* Let's say our advertisement publisher is interested in computing the Sum and Max of **AdEvents** for the dimension combinations comprised of just **advertiser** and **location**.
+* Also Let's say our publisher is computing aggregations for 1 minute and 1 hour time buckets.
 
 **1.** An **AdEvent** arrives.
 
-**2.** The **AdEvent** is applied to the aggregations for the appropriate time bucket.
+![enter image description here](https://docs.google.com/drawings/d/1W3qKJnWD5K_P2R2HpPrqCYgQrU9cMVrK3CE9UbDayC8/pub?w=960&h=720)
+
+**2.** The **AdEvent** is applied to the aggregations for the appropriate aggregator, dimension combination and time bucket.
+
+![enter image description here](https://docs.google.com/drawings/d/1vGmRoCFfqLqv8Mql5JjkB2FbqOPZ78qvzm8mBBOefJs/pub?w=960&h=720)
+
+**3.** Another **AdEvent** arrives.
+
+![enter image description here](https://docs.google.com/drawings/d/1ffovsxWZfHnSc_Z30RzGIXgzQeHjCnyZBoanO_xT_e4/pub?w=960&h=720)
+
+**4.**  The **AdEvent** is applied to the aggregations for the appropriate aggregator, dimension combination and time bucket.
+
+![enter image description here](https://docs.google.com/drawings/d/17kD7aapEKZyPxvLLp2RCl7le81qGI8gxEU_MmNoORdc/pub?w=960&h=720)
 
 #### Conclusion
 
