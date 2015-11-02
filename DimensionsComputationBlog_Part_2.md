@@ -3,7 +3,7 @@ Dimensions Computation (Aggregate Navigator) Part 2: Implementation
 
 ### Overview
 
-While the theory of how to compute the aggregations is correct, some more work is required to provide a scalable implementation of Dimensions Computation. As can be seen from the formulas provided in the sections above, the number of aggregations to maintain grows rapidly as the number of unique key values, aggregators, dimension combinations, and time buckets grows. Additionally, a scalable implementation of Dimensions Computation must be capable of handling hundreds of thousands of events per second. In order to achieve this level of performance a balance must be struck between the speed afforded by in memory processing and the need to persist large quantities of data. This balance is achieved by performing dimensions computation in three phases:
+While the theory of computing the aggregations is correct, some more work is required to provide a scalable implementation of Dimensions Computation. As can be seen from the formulas provided in the previous post, the number of aggregations to maintain grows rapidly as the number of unique key values, aggregators, dimension combinations, and time buckets grows. Additionally, a scalable implementation of Dimensions Computation must be capable of handling hundreds of thousands of events per second. In order to achieve this level of performance a balance must be struck between the speed afforded by in memory processing and the need to persist large quantities of data. This balance is achieved by performing dimensions computation in three phases:
 
 1. The **Pre-Aggregation** phase.
 2. The **Unification** phase.
@@ -11,17 +11,17 @@ While the theory of how to compute the aggregations is correct, some more work i
 
 The sections below will describe the details of each phase of Dimensions Computation, and will also provide the code snippets required to implement each phase in Data Torrent.
 
-### Pre-Aggregation
+### The Pre-aggregation Phase
 
 #### The Theory
 
 This phase allows Dimensions Computation to scale by reducing the number of events entering the system. How this is achieved can be described by the following example:
 
-* Let's say we have 500,000 **AdEvents** / second entering our system, and we want to perform Dimension Computation on those events.
+* Let's say we have 500,000 **AdEvents**/second entering our system, and we want to perform Dimension Computation on those events.
 
-Although each **AdEvent** will contribute to many aggregations (as described by the formulas above) the number of unique values of keys in the **AdEvents** will likely be much smaller than 500,000. So the total number of aggregations produced by 500,000 events will also be much smaller than 500,000. Let's say for the sake of this example that the number of aggregations produced will be on the order of 10,000. This means that if we perform Dimension Computation on batches of 500,000 tuples we can reduce 500,000 events to 10,000 aggregations.
+Although each **AdEvent** will contribute to many aggregations (as described by the formulas in the previous post) the number of unique values of keys in the **AdEvents** will likely be much smaller than 500,000. So the total number of aggregations produced by 500,000 events will also be much smaller than 500,000. Let's say for the sake of this example that the number of aggregations produced will be on the order of 10,000. This means that if we perform Dimension Computation on batches of 500,000 tuples we can reduce 500,000 events to 10,000 aggregations.
 
-The process can be sped up even further by utilizing partitioning. If a partition can handle 500,000 events / second, then 8 partitions would be able to handle 4,000,000 events / second, and those 4,000,000 events / seconds would then be compressed into 80,000 aggregations / second. These aggregations are then passed on to the Unification stage of processing.
+The process can be sped up even further by utilizing partitioning. If a partition can handle 500,000 events/second, then 8 partitions would be able to handle 4,000,000 events/second. And these 4,000,000 events/seconds would then be compressed into 80,000 aggregations/second. These aggregations are then passed on to the Unification stage of processing.
 
 **Note** that these 80,000 aggregations will not be complete aggregations for two reasons:
 
@@ -30,7 +30,7 @@ The process can be sped up even further by utilizing partitioning. If a partitio
 
 #### The Code
 
-Setting up the Pre-Aggregation phase of Dimension Computation involves configurating a Dimension Computation operator. There are several flavors of the Dimension Computation operator, the easiest to use out of the box for Java and dtAssemble is **DimensionsComputationFlexibleSingleSchemaPOJO**. This operator can receive any POJO as input (like our AdEvent) and requires the following configuration:
+Setting up the Pre-Aggregation phase of Dimensions Computation involves configuring a Dimension Computation operator. There are several flavors of the Dimension Computation operator, the easiest to use out of the box for Java and dtAssemble is **DimensionsComputationFlexibleSingleSchemaPOJO**. This operator can receive any POJO as input (like our AdEvent) and requires the following configuration:
 
 * **A JSON Schema:** The JSON schema specifies the keys, aggregates, aggregators, dimension combinations, and time buckets to be used for Dimension Computation. An example of a schema that could be used for **AdEvents** is the following:
 ```
@@ -49,8 +49,8 @@ Setting up the Pre-Aggregation phase of Dimension Computation involves configura
    {"combination":["advertiser","location"]}]
 }
 ```
-* A map from key names to the java expression used to extract the key from an incoming POJO.
-* A map from aggregate names to the java expression used to extract the aggregate from an incoming POJO.
+* A map from key names to the Java expression used to extract the key from an incoming POJO.
+* A map from aggregate names to the Java expression used to extract the aggregate from an incoming POJO.
 
 An example of how to configure a Dimensions Computation operator to process **AdEvents** is as follows:
 
@@ -74,32 +74,32 @@ dimensions.setAggregateToExpression(aggregateToExpression);
 dimensions.setConfigurationSchemaJSON(eventSchema);
 ```
 
-### Unification
+### The Unification Phase
 
 #### The Theory
 
-The Unification phase is relatively simple. It combines the outputs of all the partitions in the Pre-Aggregation phase into a single single stream which can be passed on to the storage phase. It also has the added benefit of reducing the number of aggregations even further. This is because the aggregations produced by different partitions which share the same key and time bucket can be combined to produce a single aggregation. For example, if the Unification phase is receiving 80,000 aggregations / second it is not unreasonable to expect 20,000 aggregations / second after unification.
+The Unification phase is relatively simple. It combines the outputs of all the partitions in the Pre-Aggregation phase into a single single stream which can be passed on to the storage phase. It has the added benefit of reducing the number of aggregations even further. This is because the aggregations produced by different partitions which share the same key and time bucket can be combined to produce a single aggregation. For example, if the Unification phase receives 80,000 aggregations/second, you can expect 20,000 aggregations/second after unification.
 
 #### The Code
 
-The Unification phase is implemented as a unifier which can be set on your dimensions computation operator.
+The Unification phase is implemented as a unifier that can be set on your dimensions computation operator.
 
 ```
 dimensions.setUnifier(new DimensionsComputationUnifierImpl<InputEvent, Aggregate>());
 ```
 
-### Aggregation Storage
+### The Aggregation Storage Phase
 
 #### The Theory
 
-Since the total number of aggregations produced by Dimension Computation is large and increases with time (due to time bucketing) aggregations are persisted to HDFS using HDHT. This persistence is performed by the Dimensions Store and serves two purposes:
+The total number of aggregations produced by Dimension Computation is large, and it only increases with time (due to time bucketing). Aggregations are persisted to HDFS using HDHT. This persistence is performed by the Dimensions Store and serves two purposes:
 
-* Storage so that aggregations can be retrieved for visualization.
-* Storage so that aggregations can be combined with incomplete aggregates produced by Unification.
+* Functions as a storage so that aggregations can be retrieved for visualization.
+* Functions as a storage allowing aggregations to be combined with incomplete aggregates produced by Unification.
 
 ##### Visualization
 
-The Dimension Store allows you to visualize your aggregations over time. This is done by allowing queries and responses to be received from and sent to the UI via websocket.
+The DimensionsStore allows you to visualize your aggregations over time. This is done by allowing queries and responses to be received from and sent to the UI via websocket.
 
 ##### Aggregation
 
@@ -107,16 +107,16 @@ The store produces complete aggregations by combining the incomplete aggregation
 
 ##### Scalability
 
-Since the work done by the Dimension Store is IO intensive, it cannot handle hundreds of thousands of events. The purpose of the the Pre-Aggregation and Unification phases is to reduce the cardinality of events so that the Store will almost always have a small number of events to handle. However, in cases where there are many unique values for keys, the Pre-Aggregation and Unification phases will not be sufficient to reduce the cardinality of events handled by the Dimension Store. In such cases it is possible to partition the Dimensions Store so that each partition handles the aggregates for a subset of the dimension combinations and time buckets.
+Since the work done by the DimensionsStore is IO intensive, it cannot handle hundreds of thousands of events. The purpose of the the Pre-Aggregation and Unification phases is to reduce the cardinality of events so that the Store will almost always have a small number of events to handle. However, in cases where there are many unique values for keys, the Pre-Aggregation and Unification phases will not be sufficient to reduce the cardinality of events handled by the Dimension Store. In such cases it is possible to partition the Dimensions Store so that each partition handles the aggregates for a subset of the dimension combinations and time buckets.
 
 #### The Code
 
 Configuration of the DimensionsStore involves the following:
 
 * Setting the JSON Schema.
-* Connecting Query and Result operators which are used to send queries to and receive results from the Dimension Store respectively.
+* Connecting Query and Result operators that are used to send queries to and receive results from the DimensionsStore.
 * Setting an HDHT File Implementation.
-* Setting an HDFS path in which to store aggregation data.
+* Setting an HDFS path for storing aggregation data.
 
 An example of configuring the store is as follows:
 
@@ -145,7 +145,7 @@ dag.addStream("QueryResult", store.queryResult, wsOut.input);
 
 ### Putting it all Together
 
-Combing all the pieces described above into an application that visualizes **AdEvents** looks like this:
+When you combine all the pieces described above, an application that visualizes **AdEvents** looks like this:
 
 ```
 @ApplicationAnnotation(name="AdEventDemo")
@@ -220,4 +220,4 @@ When you launch your application you can visualize the aggregations of AdEvents 
 
 ### Conclusion
 
-Aggregating huge amounts of data in real time is a major challenge that many enterprises face today. Dimension Computation provides a valuable way in which to think about the problem of aggregating data, and Data Torrent provides an implementation of of Dimension Computation that allows users to integrate data aggregation with their applications with minimal effort.
+Aggregating huge amounts of data in real time is a challenge that many enterprises face today. Dimension Computation is valuable for aggregating data, and Data Torrent provides an implementation of Dimension Computation that allows users to integrate data aggregation with their applications with minimal effort.
